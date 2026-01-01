@@ -18,11 +18,27 @@ export default function App() {
   const [pendingEliminations, setPendingEliminations] = useState([]);
   const [viewMode, setViewMode] = useState('edit'); // 'edit' or 'view'
   const [activeGameId, setActiveGameId] = useState(null);
+  const [playerStats, setPlayerStats] = useState({});
+
 
   // Load games from storage on mount
   useEffect(() => {
     loadGames();
   }, []);
+
+  useEffect(() => {
+  loadPlayerStats();
+}, []);
+  
+  // Resume last active game (Draft)
+useEffect(() => {
+  if (games.length === 0) return;
+
+  const lastGameId = localStorage.getItem('lastActiveGameId');
+  if (lastGameId) {
+    loadExistingGame(lastGameId, 'edit');
+  }
+}, [games]);  
 
   // Auto-refresh in view mode
   useEffect(() => {
@@ -50,6 +66,17 @@ export default function App() {
     }
   };
 
+  const loadPlayerStats = async () => {
+  try {
+    const result = await window.storage.get('playerStats', true);
+    if (result) {
+      setPlayerStats(JSON.parse(result.value));
+    }
+  } catch (err) {
+    console.log('No player stats yet');
+  }
+};
+  
   const loadActiveGame = async () => {
     if (!activeGameId) return;
     try {
@@ -69,6 +96,12 @@ export default function App() {
   const saveGame = async (gameData) => {
     try {
       const gameId = gameData.id || `game_${Date.now()}`;
+
+      // 👇 ADD THIS LINE (VERY IMPORTANT)
+    if (!gameData.gameOver) {
+  localStorage.setItem('lastActiveGameId', gameId);
+}
+      
       await window.storage.set(`game:${gameId}`, JSON.stringify({
         ...gameData,
         id: gameId,
@@ -125,10 +158,22 @@ export default function App() {
     setGameOver(false);
     setEliminatedPlayers([]);
     setViewMode('edit');
+    
     const newGameId = `${gameName.replace(/\s+/g, '_')}_${Date.now()}`;
     setActiveGameId(newGameId);
     setScreen('scoreboard');
-  };
+    // ✅ PASTE THIS PART HERE (VERY IMPORTANT)
+  saveGame({
+    id: newGameId,
+    gameName,
+    maxScore,
+    playerNames,
+    roundScores: [],
+    currentRound: 1,
+    gameOver: false,
+    eliminatedPlayers: []
+  });
+};
 
   const calculateTotalScore = (playerName) => {
     return roundScores.reduce((total, round) => total + (round[playerName] || 0), 0);
@@ -234,7 +279,39 @@ export default function App() {
 
   const handleEndGame = async () => {
     setGameOver(true);
+    localStorage.removeItem('lastActiveGameId');
     setShowEliminationDialog(false);
+    // 🔹 Update player lifetime stats
+let updatedStats = { ...playerStats };
+
+// Find winner (lowest score)
+let winner = playerNames.reduce((best, player) => {
+  if (!best) return player;
+  return calculateTotalScore(player) < calculateTotalScore(best)
+    ? player
+    : best;
+}, null);
+
+playerNames.forEach(player => {
+  if (!updatedStats[player]) {
+    updatedStats[player] = { games: 0, wins: 0 };
+  }
+
+  updatedStats[player].games += 1;
+
+  if (player === winner) {
+    updatedStats[player].wins += 1;
+  }
+});
+
+// Save stats
+setPlayerStats(updatedStats);
+await window.storage.set(
+  'playerStats',
+  JSON.stringify(updatedStats),
+  true
+);
+    
     await saveGame({
       id: activeGameId,
       gameName,
@@ -322,6 +399,7 @@ export default function App() {
           {games.length > 0 && (
             <div className="bg-white rounded-2xl shadow-lg p-6">
               <h2 className="text-xl font-semibold mb-4 text-gray-800">Recent Games</h2>
+
               <div className="space-y-3">
                 {games.slice(0, 5).map((game) => (
                   <div key={game.id} className="p-4 bg-gray-50 rounded-lg">
@@ -351,6 +429,27 @@ export default function App() {
               </div>
             </div>
           )}
+          {Object.keys(playerStats).length > 0 && (
+  <div className="bg-white rounded-2xl shadow-lg p-6 mt-6">
+    <h2 className="text-xl font-semibold mb-4 text-gray-800">
+      🏆 Player Progress
+    </h2>
+
+    <div className="space-y-2">
+      {Object.entries(playerStats).map(([player, stats]) => (
+        <div
+          key={player}
+          className="flex justify-between bg-gray-50 p-3 rounded-lg"
+        >
+          <span className="font-semibold">{player}</span>
+          <span className="text-gray-700">
+            Games: {stats.games} | Wins: {stats.wins}
+          </span>
+        </div>
+      ))}
+    </div>
+  </div>
+)}
         </div>
       </div>
     );
