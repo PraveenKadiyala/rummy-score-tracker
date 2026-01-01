@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { AlertCircle, Save, Trophy, RotateCcw, PlayCircle, Eye, Edit } from 'lucide-react';
+import { AlertCircle, Plus, Save, Trophy, RotateCcw, PlayCircle, Eye, Edit } from 'lucide-react';
 
-export default function App() {
+export default function RummyScoreTracker() {
   const [screen, setScreen] = useState('home');
   const [setupStep, setSetupStep] = useState(1);
   const [numPlayers, setNumPlayers] = useState('');
@@ -16,128 +16,256 @@ export default function App() {
   const [eliminatedPlayers, setEliminatedPlayers] = useState([]);
   const [showEliminationDialog, setShowEliminationDialog] = useState(false);
   const [pendingEliminations, setPendingEliminations] = useState([]);
-  const [viewMode, setViewMode] = useState('edit');
+  const [viewMode, setViewMode] = useState('edit'); // 'edit' or 'view'
   const [activeGameId, setActiveGameId] = useState(null);
 
-  // 🔹 NEW: edit last round only
-  const [editingLastRound, setEditingLastRound] = useState(false);
-
-  // 🔹 NEW: resume last game automatically
+  // Load games from storage on mount
   useEffect(() => {
-    const lastGameId = localStorage.getItem('lastGameId');
-    if (lastGameId) {
-      loadExistingGame(lastGameId, 'edit');
-    } else {
-      loadGames();
-    }
+    loadGames();
   }, []);
 
   // Auto-refresh in view mode
   useEffect(() => {
     if (viewMode === 'view' && activeGameId) {
-      const interval = setInterval(loadActiveGame, 2000);
+      const interval = setInterval(() => {
+        loadActiveGame();
+      }, 2000); // Refresh every 2 seconds
       return () => clearInterval(interval);
     }
   }, [viewMode, activeGameId]);
 
   const loadGames = async () => {
     try {
-      const stored = await window.storage.list('game:', true);
-      if (stored?.keys) {
+      const stored = await window.storage.list('game:');
+      if (stored && stored.keys) {
         const gamePromises = stored.keys.map(async (key) => {
-          const result = await window.storage.get(key, true);
+          const result = await window.storage.get(key);
           return result ? JSON.parse(result.value) : null;
         });
-        const loadedGames = (await Promise.all(gamePromises)).filter(Boolean);
+        const loadedGames = (await Promise.all(gamePromises)).filter(g => g);
         setGames(loadedGames.sort((a, b) => b.timestamp - a.timestamp));
       }
-    } catch {}
+    } catch (err) {
+      console.log('No saved games yet');
+    }
   };
 
   const loadActiveGame = async () => {
     if (!activeGameId) return;
-    const result = await window.storage.get(`game:${activeGameId}`, true);
-    if (result) {
-      const game = JSON.parse(result.value);
-      setRoundScores(game.roundScores);
-      setCurrentRound(game.currentRound);
-      setEliminatedPlayers(game.eliminatedPlayers || []);
-      setGameOver(game.gameOver);
+    try {
+      const result = await window.storage.get(`game:${activeGameId}`);
+      if (result) {
+        const game = JSON.parse(result.value);
+        setRoundScores(game.roundScores);
+        setCurrentRound(game.currentRound);
+        setEliminatedPlayers(game.eliminatedPlayers || []);
+        setGameOver(game.gameOver);
+      }
+    } catch (err) {
+      console.error('Failed to load active game:', err);
     }
   };
 
   const saveGame = async (gameData) => {
-    await window.storage.set(
-      `game:${gameData.id}`,
-      JSON.stringify({ ...gameData, timestamp: Date.now() }),
-      true
-    );
-    localStorage.setItem('lastGameId', gameData.id);
-    await loadGames();
+    try {
+      const gameId = gameData.id || `game_${Date.now()}`;
+      await window.storage.set(`game:${gameId}`, JSON.stringify({
+        ...gameData,
+        id: gameId,
+        timestamp: Date.now()
+      }), true); // true = shared storage, visible to all users
+      await loadGames();
+    } catch (err) {
+      console.error('Failed to save game:', err);
+    }
   };
 
   const loadExistingGame = async (gameId, mode = 'edit') => {
-    const result = await window.storage.get(`game:${gameId}`, true);
-    if (result) {
-      const game = JSON.parse(result.value);
-      setGameName(game.gameName);
-      setMaxScore(game.maxScore);
-      setPlayerNames(game.playerNames);
-      setRoundScores(game.roundScores);
-      setCurrentRound(game.currentRound);
-      setGameOver(game.gameOver);
-      setEliminatedPlayers(game.eliminatedPlayers || []);
-      setViewMode(mode);
-      setActiveGameId(gameId);
-      setScreen('scoreboard');
+    try {
+      const result = await window.storage.get(`game:${gameId}`);
+      if (result) {
+        const game = JSON.parse(result.value);
+        setGameName(game.gameName);
+        setMaxScore(game.maxScore);
+        setPlayerNames(game.playerNames);
+        setRoundScores(game.roundScores);
+        setCurrentRound(game.currentRound);
+        setGameOver(game.gameOver);
+        setEliminatedPlayers(game.eliminatedPlayers || []);
+        setViewMode(mode);
+        setActiveGameId(gameId);
+        setScreen('scoreboard');
+      }
+    } catch (err) {
+      console.error('Failed to load game:', err);
+    }
+  };
+
+  const handleSetupNext = () => {
+    if (setupStep === 1 && numPlayers >= 2 && numPlayers <= 6) {
+      setPlayerNames(Array(parseInt(numPlayers)).fill(''));
+      setSetupStep(2);
+    } else if (setupStep === 2 && playerNames.every(name => name.trim())) {
+      setSetupStep(3);
+    } else if (setupStep === 3 && gameName.trim()) {
+      setSetupStep(4);
+    } else if (setupStep === 4 && maxScore > 0) {
+      startGame();
     }
   };
 
   const startGame = () => {
-    const input = {};
-    playerNames.forEach(p => (input[p] = 0));
-    const id = `${gameName.replace(/\s+/g, '_')}_${Date.now()}`;
-    setCurrentRoundInput(input);
+    const initialRoundScores = {};
+    playerNames.forEach(name => {
+      initialRoundScores[name] = 0;
+    });
+    setCurrentRoundInput(initialRoundScores);
     setRoundScores([]);
     setCurrentRound(1);
     setGameOver(false);
     setEliminatedPlayers([]);
-    setEditingLastRound(false);
-    setActiveGameId(id);
-    localStorage.setItem('lastGameId', id);
+    setViewMode('edit');
+    const newGameId = `${gameName.replace(/\s+/g, '_')}_${Date.now()}`;
+    setActiveGameId(newGameId);
     setScreen('scoreboard');
   };
 
-  const calculateTotalScore = (player) =>
-    roundScores.reduce((sum, r) => sum + (r[player] || 0), 0);
+  const calculateTotalScore = (playerName) => {
+    return roundScores.reduce((total, round) => total + (round[playerName] || 0), 0);
+  };
 
-  // 🔹 EDIT LAST ROUND LOGIC
+  const playEliminationSound = () => {
+    // Create a fun elimination sound using Web Audio API
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    
+    // Dramatic descending tone sequence
+    const frequencies = [880, 660, 440, 330];
+    const startTime = audioContext.currentTime;
+    
+    frequencies.forEach((freq, index) => {
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      
+      oscillator.frequency.value = freq;
+      oscillator.type = 'sine';
+      
+      const time = startTime + (index * 0.15);
+      gainNode.gain.setValueAtTime(0.3, time);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, time + 0.15);
+      
+      oscillator.start(time);
+      oscillator.stop(time + 0.15);
+    });
+    
+    // Add a final "whoosh" sound
+    setTimeout(() => {
+      const whiteNoise = audioContext.createBufferSource();
+      const bufferSize = audioContext.sampleRate * 0.3;
+      const buffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
+      const output = buffer.getChannelData(0);
+      
+      for (let i = 0; i < bufferSize; i++) {
+        output[i] = Math.random() * 2 - 1;
+      }
+      
+      whiteNoise.buffer = buffer;
+      
+      const filter = audioContext.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.value = 1000;
+      
+      const gainNode = audioContext.createGain();
+      gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+      
+      whiteNoise.connect(filter);
+      filter.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      
+      whiteNoise.start();
+      whiteNoise.stop(audioContext.currentTime + 0.3);
+    }, 600);
+  };
+
   const saveRound = async () => {
-    let updatedRounds = [...roundScores];
+    const newRoundScores = [...roundScores, { ...currentRoundInput }];
+    setRoundScores(newRoundScores);
 
-    if (editingLastRound) {
-      updatedRounds[updatedRounds.length - 1] = { ...currentRoundInput };
-      setEditingLastRound(false);
-    } else {
-      updatedRounds.push({ ...currentRoundInput });
-      setCurrentRound(currentRound + 1);
+    // Check which players exceeded max score
+    const newEliminations = [];
+    playerNames.forEach(name => {
+      if (!eliminatedPlayers.includes(name)) {
+        const total = newRoundScores.reduce((sum, round) => sum + (round[name] || 0), 0);
+        if (total >= parseInt(maxScore)) {
+          newEliminations.push(name);
+        }
+      }
+    });
+
+    if (newEliminations.length > 0) {
+      playEliminationSound();
+      setPendingEliminations(newEliminations);
+      setShowEliminationDialog(true);
     }
 
-    setRoundScores(updatedRounds);
+    // Reset current round input
+    const resetInput = {};
+    playerNames.forEach(name => {
+      resetInput[name] = 0;
+    });
+    setCurrentRoundInput(resetInput);
+    setCurrentRound(currentRound + 1);
 
-    const reset = {};
-    playerNames.forEach(p => (reset[p] = 0));
-    setCurrentRoundInput(reset);
+    // Save game state
+    await saveGame({
+      id: activeGameId,
+      gameName,
+      maxScore,
+      playerNames,
+      roundScores: newRoundScores,
+      currentRound: currentRound + 1,
+      gameOver: false,
+      eliminatedPlayers: eliminatedPlayers
+    });
+  };
+
+  const handleEndGame = async () => {
+    setGameOver(true);
+    setShowEliminationDialog(false);
+    await saveGame({
+      id: activeGameId,
+      gameName,
+      maxScore,
+      playerNames,
+      roundScores,
+      currentRound,
+      gameOver: true,
+      eliminatedPlayers: [...eliminatedPlayers, ...pendingEliminations]
+    });
+  };
+
+  const handleContinueGame = async () => {
+    const newEliminatedPlayers = [...eliminatedPlayers, ...pendingEliminations];
+    setEliminatedPlayers(newEliminatedPlayers);
+    setShowEliminationDialog(false);
+
+    // Check if all players are eliminated
+    if (newEliminatedPlayers.length >= playerNames.length) {
+      setGameOver(true);
+    }
 
     await saveGame({
       id: activeGameId,
       gameName,
       maxScore,
       playerNames,
-      roundScores: updatedRounds,
-      currentRound: editingLastRound ? currentRound : currentRound + 1,
-      gameOver,
-      eliminatedPlayers
+      roundScores,
+      currentRound,
+      gameOver: newEliminatedPlayers.length >= playerNames.length,
+      eliminatedPlayers: newEliminatedPlayers
     });
   };
 
@@ -145,89 +273,441 @@ export default function App() {
     setRoundScores([]);
     setCurrentRound(1);
     setGameOver(false);
-    setEditingLastRound(false);
+    setEliminatedPlayers([]);
+    const resetInput = {};
+    playerNames.forEach(name => {
+      resetInput[name] = 0;
+    });
+    setCurrentRoundInput(resetInput);
   };
 
-  /* ========================= UI BELOW (UNCHANGED) ========================= */
+  const getActivePlayers = () => {
+    return playerNames.filter(name => !eliminatedPlayers.includes(name));
+  };
 
+  const getSortedPlayers = () => {
+    return [...playerNames].sort((a, b) => {
+      return calculateTotalScore(a) - calculateTotalScore(b);
+    });
+  };
+
+  // Home Screen
   if (screen === 'home') {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <button
-          onClick={() => {
-            setScreen('setup');
-            setSetupStep(1);
-            setNumPlayers('');
-            setPlayerNames([]);
-            setGameName('');
-            setMaxScore('');
-          }}
-          className="bg-green-600 text-white px-6 py-4 rounded-xl"
-        >
-          <PlayCircle className="inline mr-2" /> Start New Game
-        </button>
+      <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 p-6">
+        <div className="max-w-2xl mx-auto">
+          <div className="text-center mb-8">
+            <Trophy className="w-16 h-16 mx-auto mb-4 text-green-600" />
+            <h1 className="text-4xl font-bold text-gray-800 mb-2">Rummy Score Tracker</h1>
+            <p className="text-gray-600">Never calculate totals manually again</p>
+          </div>
+
+          <div className="bg-white rounded-2xl shadow-lg p-8 mb-6">
+            <button
+              onClick={() => {
+                setScreen('setup');
+                setSetupStep(1);
+                setNumPlayers('');
+                setPlayerNames([]);
+                setGameName('');
+                setMaxScore('');
+              }}
+              className="w-full bg-green-600 text-white py-4 rounded-xl font-semibold text-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
+            >
+              <PlayCircle className="w-6 h-6" />
+              Start New Game
+            </button>
+          </div>
+
+          {games.length > 0 && (
+            <div className="bg-white rounded-2xl shadow-lg p-6">
+              <h2 className="text-xl font-semibold mb-4 text-gray-800">Recent Games</h2>
+              <div className="space-y-3">
+                {games.slice(0, 5).map((game) => (
+                  <div key={game.id} className="p-4 bg-gray-50 rounded-lg">
+                    <div className="font-semibold text-gray-800 mb-2">{game.gameName}</div>
+                    <div className="text-sm text-gray-600 mb-3">
+                      {game.playerNames.length} players • Round {game.currentRound}
+                      {game.gameOver && <span className="ml-2 text-red-600">• Finished</span>}
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => loadExistingGame(game.id, 'edit')}
+                        className="flex-1 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
+                      >
+                        <Edit className="w-4 h-4" />
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => loadExistingGame(game.id, 'view')}
+                        className="flex-1 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                      >
+                        <Eye className="w-4 h-4" />
+                        View Only
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     );
   }
 
+  // Setup Screen
   if (screen === 'setup') {
-    if (setupStep === 4) startGame();
-    return null;
-  }
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 p-6">
+        <div className="max-w-2xl mx-auto">
+          <div className="bg-white rounded-2xl shadow-lg p-8">
+            <div className="mb-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-2xl font-bold text-gray-800">Game Setup</h2>
+                <span className="text-sm text-gray-500">Step {setupStep} of 4</span>
+              </div>
+              <div className="w-full bg-gray-200 h-2 rounded-full">
+                <div
+                  className="bg-green-600 h-2 rounded-full transition-all"
+                  style={{ width: `${(setupStep / 4) * 100}%` }}
+                />
+              </div>
+            </div>
 
-  return (
-    <div className="p-4">
-      <h1 className="text-2xl font-bold mb-4">{gameName}</h1>
-
-      {roundScores.length > 0 && !editingLastRound && (
-        <button
-          onClick={() => {
-            setEditingLastRound(true);
-            setCurrentRoundInput({ ...roundScores[roundScores.length - 1] });
-          }}
-          className="mb-3 bg-yellow-500 text-white px-4 py-2 rounded"
-        >
-          Edit Last Round
-        </button>
-      )}
-
-      <table className="w-full border">
-        <tbody>
-          {playerNames.map(player => (
-            <tr key={player}>
-              <td>{player}</td>
-              <td>
+            {setupStep === 1 && (
+              <div>
+                <label className="block text-lg font-semibold mb-3 text-gray-700">
+                  How many players are playing?
+                </label>
                 <input
                   type="number"
-                  max="80"
-                  value={currentRoundInput[player] || 0}
-                  onChange={(e) =>
-                    setCurrentRoundInput({
-                      ...currentRoundInput,
-                      [player]: Math.min(80, Number(e.target.value))
-                    })
-                  }
+                  min="2"
+                  max="6"
+                  value={numPlayers}
+                  onChange={(e) => setNumPlayers(e.target.value)}
+                  className="w-full p-4 text-2xl border-2 border-gray-300 rounded-xl focus:border-green-600 focus:outline-none"
+                  placeholder="2-6 players"
+                  autoFocus
                 />
-              </td>
-              <td>{calculateTotalScore(player)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+                <p className="mt-2 text-sm text-gray-500">Minimum 2, Maximum 6 players</p>
+              </div>
+            )}
 
-      <button
-        onClick={saveRound}
-        className="mt-4 bg-green-600 text-white px-6 py-3 rounded"
-      >
-        <Save className="inline mr-2" />
-        {editingLastRound ? 'Save Changes' : 'Save Round'}
-      </button>
+            {setupStep === 2 && (
+              <div>
+                <label className="block text-lg font-semibold mb-3 text-gray-700">
+                  Enter player names
+                </label>
+                <div className="space-y-3">
+                  {playerNames.map((name, idx) => (
+                    <input
+                      key={idx}
+                      type="text"
+                      value={name}
+                      onChange={(e) => {
+                        const newNames = [...playerNames];
+                        newNames[idx] = e.target.value;
+                        setPlayerNames(newNames);
+                      }}
+                      className="w-full p-4 text-lg border-2 border-gray-300 rounded-xl focus:border-green-600 focus:outline-none"
+                      placeholder={`Player ${idx + 1} name`}
+                      autoFocus={idx === 0}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
 
-      {gameOver && (
-        <button onClick={resetGame} className="mt-4 bg-gray-500 text-white px-4 py-2 rounded">
-          <RotateCcw className="inline mr-2" /> Reset Game
-        </button>
-      )}
+            {setupStep === 3 && (
+              <div>
+                <label className="block text-lg font-semibold mb-3 text-gray-700">
+                  Game Name
+                </label>
+                <input
+                  type="text"
+                  value={gameName}
+                  onChange={(e) => setGameName(e.target.value)}
+                  className="w-full p-4 text-xl border-2 border-gray-300 rounded-xl focus:border-green-600 focus:outline-none"
+                  placeholder="e.g., Friday Night Rummy"
+                  autoFocus
+                />
+              </div>
+            )}
+
+            {setupStep === 4 && (
+              <div>
+                <label className="block text-lg font-semibold mb-3 text-gray-700">
+                  Maximum Score Limit
+                </label>
+                <input
+                  type="number"
+                  value={maxScore}
+                  onChange={(e) => setMaxScore(e.target.value)}
+                  className="w-full p-4 text-2xl border-2 border-gray-300 rounded-xl focus:border-green-600 focus:outline-none"
+                  placeholder="e.g., 101, 201, 501"
+                  autoFocus
+                />
+                <p className="mt-2 text-sm text-gray-500">Players will be eliminated when they reach this score</p>
+              </div>
+            )}
+
+            <div className="flex gap-3 mt-8">
+              {setupStep > 1 && (
+                <button
+                  onClick={() => setSetupStep(setupStep - 1)}
+                  className="flex-1 py-4 border-2 border-gray-300 rounded-xl font-semibold text-gray-700 hover:bg-gray-50"
+                >
+                  Back
+                </button>
+              )}
+              <button
+                onClick={handleSetupNext}
+                disabled={
+                  (setupStep === 1 && (numPlayers < 2 || numPlayers > 6)) ||
+                  (setupStep === 2 && !playerNames.every(name => name.trim())) ||
+                  (setupStep === 3 && !gameName.trim()) ||
+                  (setupStep === 4 && maxScore <= 0)
+                }
+                className="flex-1 py-4 bg-green-600 text-white rounded-xl font-semibold hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+              >
+                {setupStep === 4 ? 'Start Game' : 'Next'}
+              </button>
+            </div>
+
+            <button
+              onClick={() => setScreen('home')}
+              className="w-full mt-4 py-3 text-gray-600 hover:text-gray-800"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Scoreboard Screen
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 p-4">
+      <div className="max-w-4xl mx-auto">
+        {/* Header */}
+        <div className="bg-white rounded-2xl shadow-lg p-6 mb-4">
+          <div className="flex items-center justify-between mb-2">
+            <h1 className="text-2xl font-bold text-gray-800">{gameName}</h1>
+            <div className="flex gap-2">
+              {viewMode === 'view' && (
+                <div className="px-3 py-1 bg-blue-100 text-blue-800 rounded-lg text-sm font-semibold flex items-center gap-1">
+                  <Eye className="w-4 h-4" />
+                  View Only
+                </div>
+              )}
+              <button
+                onClick={() => setScreen('home')}
+                className="px-4 py-2 text-sm bg-gray-200 rounded-lg hover:bg-gray-300"
+              >
+                Exit
+              </button>
+            </div>
+          </div>
+          <div className="flex items-center gap-4 text-gray-600">
+            <span className="text-lg font-semibold">Round {currentRound}</span>
+            <span className="text-sm">Max Score: {maxScore}</span>
+            {eliminatedPlayers.length > 0 && (
+              <span className="text-sm text-red-600">
+                {eliminatedPlayers.length} eliminated
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Elimination Dialog */}
+        {showEliminationDialog && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full">
+              <div className="flex items-start gap-3 mb-4">
+                <AlertCircle className="w-8 h-8 text-orange-600 flex-shrink-0 mt-1" />
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-800 mb-2">Player(s) Eliminated!</h2>
+                  <p className="text-gray-600 mb-3">
+                    The following player(s) have crossed {maxScore} points:
+                  </p>
+                  <div className="bg-orange-50 p-3 rounded-lg mb-4">
+                    {pendingEliminations.map(player => (
+                      <div key={player} className="font-semibold text-orange-800 mb-1">
+                        • {player} - {calculateTotalScore(player)} points
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-gray-700 font-medium mb-4">
+                    Would you like to end the game or continue with the remaining players?
+                  </p>
+                  <div className="space-y-3">
+                    <button
+                      onClick={handleEndGame}
+                      className="w-full py-3 bg-red-600 text-white rounded-xl font-semibold hover:bg-red-700 transition-colors"
+                    >
+                      End Game & Declare Winner
+                    </button>
+                    <button
+                      onClick={handleContinueGame}
+                      className="w-full py-3 bg-green-600 text-white rounded-xl font-semibold hover:bg-green-700 transition-colors"
+                    >
+                      Continue with Remaining Players
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Game Over Dialog */}
+        {gameOver && (
+          <div className="bg-red-50 border-2 border-red-200 rounded-2xl shadow-lg p-6 mb-4">
+            <div className="flex items-start gap-3 mb-4">
+              <Trophy className="w-8 h-8 text-red-600 flex-shrink-0" />
+              <div>
+                <h2 className="text-2xl font-bold text-red-800 mb-2">Game Over!</h2>
+                <p className="text-red-700 mb-4">Final Standings (Lowest Score Wins)</p>
+                <div className="space-y-2 mb-4">
+                  {getSortedPlayers().map((player, idx) => {
+                    const isEliminated = eliminatedPlayers.includes(player);
+                    return (
+                      <div key={player} className={`flex items-center justify-between bg-white p-3 rounded-lg ${isEliminated ? 'opacity-60' : ''}`}>
+                        <span className="font-semibold">
+                          {idx === 0 && !isEliminated && '🏆 '}
+                          {idx + 1}. {player}
+                          {isEliminated && <span className="text-xs ml-2 text-red-600">(Eliminated)</span>}
+                        </span>
+                        <span className="text-xl font-bold text-gray-800">{calculateTotalScore(player)}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+                {viewMode === 'edit' && (
+                  <div className="flex gap-3">
+                    <button
+                      onClick={resetGame}
+                      className="flex-1 py-3 bg-green-600 text-white rounded-xl font-semibold hover:bg-green-700 flex items-center justify-center gap-2"
+                    >
+                      <RotateCcw className="w-5 h-5" />
+                      Reset Game
+                    </button>
+                    <button
+                      onClick={() => setScreen('home')}
+                      className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700"
+                    >
+                      New Game
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Scoreboard */}
+        <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-green-600 text-white">
+                <tr>
+                  <th className="p-4 text-left font-semibold">Player</th>
+                  <th className="p-4 text-center font-semibold">Round Score<br/><span className="text-xs font-normal">(Max: 80)</span></th>
+                  <th className="p-4 text-center font-semibold">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {getSortedPlayers().map((player, idx) => {
+                  const total = calculateTotalScore(player);
+                  const isEliminated = eliminatedPlayers.includes(player);
+                  const exceedsMax = total >= parseInt(maxScore);
+                  return (
+                    <tr key={player} className={`border-b ${isEliminated ? 'bg-red-50' : exceedsMax ? 'bg-orange-50' : idx % 2 === 0 ? 'bg-gray-50' : 'bg-white'}`}>
+                      <td className="p-4 font-semibold text-gray-800">
+                        {player}
+                        {isEliminated && <span className="ml-2 text-xs bg-red-200 text-red-800 px-2 py-1 rounded">Eliminated</span>}
+                        {!isEliminated && exceedsMax && <AlertCircle className="inline w-4 h-4 ml-2 text-orange-600" />}
+                      </td>
+                      <td className="p-4">
+                        {viewMode === 'edit' && !isEliminated && !gameOver ? (
+                          <input
+                            type="number"
+                            min="0"
+                            max="80"
+                            value={currentRoundInput[player] || 0}
+                            onChange={(e) => {
+                              const value = parseInt(e.target.value) || 0;
+                              if (value <= 80 && value >= 0) {
+                                setCurrentRoundInput({
+                                  ...currentRoundInput,
+                                  [player]: value
+                                });
+                              }
+                            }}
+                            className="w-full p-3 text-xl text-center border-2 border-gray-300 rounded-lg focus:border-green-600 focus:outline-none"
+                          />
+                        ) : (
+                          <div className="w-full p-3 text-xl text-center text-gray-500">
+                            {isEliminated || gameOver ? '-' : (currentRoundInput[player] || 0)}
+                          </div>
+                        )}
+                      </td>
+                      <td className={`p-4 text-center text-2xl font-bold ${isEliminated ? 'text-red-600' : exceedsMax ? 'text-orange-600' : 'text-gray-800'}`}>
+                        {total}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {viewMode === 'edit' && !gameOver && getActivePlayers().length > 0 && (
+            <div className="p-4 bg-gray-50">
+              <button
+                onClick={saveRound}
+                className="w-full py-4 bg-green-600 text-white rounded-xl font-semibold text-lg hover:bg-green-700 flex items-center justify-center gap-2"
+              >
+                <Save className="w-5 h-5" />
+                Save Round {currentRound}
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Round History */}
+        {roundScores.length > 0 && (
+          <div className="bg-white rounded-2xl shadow-lg p-6 mt-4">
+            <h3 className="text-lg font-semibold mb-4 text-gray-800">Round History</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-100">
+                  <tr>
+                    <th className="p-2 text-left">Round</th>
+                    {playerNames.map(player => (
+                      <th key={player} className="p-2 text-center">{player}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {roundScores.map((round, idx) => (
+                    <tr key={idx} className="border-b">
+                      <td className="p-2 font-semibold text-gray-600">{idx + 1}</td>
+                      {playerNames.map(player => (
+                        <td key={player} className="p-2 text-center text-gray-800">
+                          {round[player] || 0}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
