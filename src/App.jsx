@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { AlertCircle, Plus, Save, Trophy, RotateCcw, PlayCircle, Eye, Edit } from 'lucide-react';
 
-export default function RummyScoreTracker() {
+export default function App() {
   const [screen, setScreen] = useState('home');
   const [setupStep, setSetupStep] = useState(1);
   const [numPlayers, setNumPlayers] = useState('');
@@ -36,10 +36,10 @@ export default function RummyScoreTracker() {
 
   const loadGames = async () => {
     try {
-      const stored = await window.storage.list('game:');
+      const stored = await window.storage.list('game:', true); // true = load from shared storage
       if (stored && stored.keys) {
         const gamePromises = stored.keys.map(async (key) => {
-          const result = await window.storage.get(key);
+          const result = await window.storage.get(key, true); // true = shared storage
           return result ? JSON.parse(result.value) : null;
         });
         const loadedGames = (await Promise.all(gamePromises)).filter(g => g);
@@ -53,7 +53,7 @@ export default function RummyScoreTracker() {
   const loadActiveGame = async () => {
     if (!activeGameId) return;
     try {
-      const result = await window.storage.get(`game:${activeGameId}`);
+      const result = await window.storage.get(`game:${activeGameId}`, true); // true = shared storage
       if (result) {
         const game = JSON.parse(result.value);
         setRoundScores(game.roundScores);
@@ -82,7 +82,7 @@ export default function RummyScoreTracker() {
 
   const loadExistingGame = async (gameId, mode = 'edit') => {
     try {
-      const result = await window.storage.get(`game:${gameId}`);
+      const result = await window.storage.get(`game:${gameId}`, true); // true = shared storage
       if (result) {
         const game = JSON.parse(result.value);
         setGameName(game.gameName);
@@ -571,7 +571,7 @@ export default function RummyScoreTracker() {
                 <h2 className="text-2xl font-bold text-red-800 mb-2">Game Over!</h2>
                 <p className="text-red-700 mb-4">Final Standings (Lowest Score Wins)</p>
                 <div className="space-y-2 mb-4">
-                  {getSortedPlayers().map((player, idx) => {
+                  {playerNames.map((player, idx) => {
                     const isEliminated = eliminatedPlayers.includes(player);
                     return (
                       <div key={player} className={`flex items-center justify-between bg-white p-3 rounded-lg ${isEliminated ? 'opacity-60' : ''}`}>
@@ -619,7 +619,7 @@ export default function RummyScoreTracker() {
                 </tr>
               </thead>
               <tbody>
-                {getSortedPlayers().map((player, idx) => {
+                {playerNames.map((player, idx) => {
                   const total = calculateTotalScore(player);
                   const isEliminated = eliminatedPlayers.includes(player);
                   const exceedsMax = total >= parseInt(maxScore);
