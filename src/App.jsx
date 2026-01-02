@@ -361,6 +361,17 @@ localStorage.setItem('playerStats', JSON.stringify(updatedStats));
                 setGameName('');
                 setMaxScore('');
               }}
+
+              <button
+  onClick={() => {
+    setGameName('');
+    setScreen('join');
+  }}
+  className="w-full mt-4 bg-blue-600 text-white py-4 rounded-xl font-semibold text-lg hover:bg-blue-700 transition-colors"
+>
+  🔍 Join Existing Game
+</button>
+            
               className="w-full bg-green-600 text-white py-4 rounded-xl font-semibold text-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
             >
               <PlayCircle className="w-6 h-6" />
@@ -526,6 +537,52 @@ localStorage.setItem('playerStats', JSON.stringify(updatedStats));
     );
   }
 
+  // Join Game Screen
+if (screen === 'join') {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 p-6">
+      <div className="max-w-md mx-auto">
+        <div className="bg-white rounded-2xl shadow-lg p-8">
+          <h2 className="text-2xl font-bold text-gray-800 mb-4 text-center">
+            Join Game
+          </h2>
+
+          <label className="block text-lg font-semibold mb-3 text-gray-700">
+            Enter Game Name
+          </label>
+
+          <input
+            type="text"
+            value={gameName}
+            onChange={(e) => setGameName(e.target.value)}
+            className="w-full p-4 text-xl border-2 border-gray-300 rounded-xl focus:border-blue-600 focus:outline-none"
+            placeholder="Exact game name"
+            autoFocus
+          />
+
+          <button
+            onClick={() => {
+              if (!gameName.trim()) return;
+              loadExistingGame(gameName.trim(), 'view');
+            }}
+            className="w-full mt-6 py-4 bg-blue-600 text-white rounded-xl font-semibold text-lg hover:bg-blue-700"
+          >
+            👀 View Live Scores
+          </button>
+
+          <button
+            onClick={() => setScreen('home')}
+            className="w-full mt-4 py-3 text-gray-600 hover:text-gray-800"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+  
   // Scoreboard Screen
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 p-4">
