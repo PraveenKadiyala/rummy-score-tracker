@@ -41,7 +41,7 @@ useEffect(() => {
   }, 2000);
 
   return () => clearInterval(interval);
-}, [gameName, gameOver]);
+}, [gameName, gameOver, viewMode]);
 
 
   const loadPlayerStats = () => {
