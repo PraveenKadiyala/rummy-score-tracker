@@ -351,33 +351,34 @@ localStorage.setItem('playerStats', JSON.stringify(updatedStats));
             <p className="text-gray-600">Never calculate totals manually again</p>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-lg p-8 mb-6">
-            <button
-              onClick={() => {
-                setScreen('setup');
-                setSetupStep(1);
-                setNumPlayers('');
-                setPlayerNames([]);
-                setGameName('');
-                setMaxScore('');
-              }}
+<div className="bg-white rounded-2xl shadow-lg p-8 mb-6">
+  {/* Start New Game */}
+  <button
+    onClick={() => {
+      setScreen('setup');
+      setSetupStep(1);
+      setNumPlayers('');
+      setPlayerNames([]);
+      setGameName('');
+      setMaxScore('');
+    }}
+    className="w-full bg-green-600 text-white py-4 rounded-xl font-semibold text-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
+  >
+    <PlayCircle className="w-6 h-6" />
+    Start New Game
+  </button>
 
-              <button
-  onClick={() => {
-    setGameName('');
-    setScreen('join');
-  }}
-  className="w-full mt-4 bg-blue-600 text-white py-4 rounded-xl font-semibold text-lg hover:bg-blue-700 transition-colors"
->
-  🔍 Join Existing Game
-</button>
-            
-              className="w-full bg-green-600 text-white py-4 rounded-xl font-semibold text-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
-            >
-              <PlayCircle className="w-6 h-6" />
-              Start New Game
-            </button>
-          </div>
+  {/* Join Existing Game */}
+  <button
+    onClick={() => {
+      setGameName('');
+      setScreen('join');
+    }}
+    className="w-full mt-4 bg-blue-600 text-white py-4 rounded-xl font-semibold text-lg hover:bg-blue-700 transition-colors"
+  >
+    🔍 Join Existing Game
+  </button>
+</div>
 
           
           {Object.keys(playerStats).length > 0 && (
