@@ -1,3 +1,22 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  .print-scorecard,
+  .print-scorecard * {
+    visibility: visible;
+  }
+
+  .print-scorecard {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    padding: 16px;
+  }
+}
