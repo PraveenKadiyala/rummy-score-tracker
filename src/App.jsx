@@ -1,4 +1,3 @@
-import { supabase } from './supabase';
 import React, { useState, useEffect } from 'react';
 import { AlertCircle, Save, Trophy, RotateCcw, PlayCircle, Eye, Edit } from 'lucide-react';
 
@@ -18,7 +17,28 @@ export default function App() {
   const [pendingEliminations, setPendingEliminations] = useState([]);
   const [viewMode, setViewMode] = useState('edit'); // 'edit' or 'view'
     const [playerStats, setPlayerStats] = useState({});
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
+const supabaseFetch = async (endpoint, options = {}) => {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${endpoint}`, {
+    headers: {
+      apikey: SUPABASE_KEY,
+      Authorization: `Bearer ${SUPABASE_KEY}`,
+      'Content-Type': 'application/json',
+      Prefer: 'resolution=merge-duplicates',
+      ...options.headers,
+    },
+    ...options,
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(err);
+  }
+
+  return res.json();
+};
 
   useEffect(() => {
   loadPlayerStats();
@@ -54,28 +74,28 @@ useEffect(() => {
   const loadActiveGame = async () => {
   if (!gameName) return;
 
-  const { data } = await supabase
-    .from('games')
-    .select('*')
-    .eq('game_name', gameName)
-    .single();
+  const data = await supabaseFetch(
+    `games?game_name=eq.${encodeURIComponent(gameName)}&select=data`
+  );
 
-  if (!data) return;
+  if (!data.length) return;
 
-  const game = data.data;
+  const game = data[0].data;
+
   setRoundScores(game.roundScores);
   setCurrentRound(game.currentRound);
   setEliminatedPlayers(game.eliminatedPlayers || []);
   setGameOver(game.gameOver);
 };
   const saveGame = async (gameData) => {
-  await supabase
-    .from('games')
-    .upsert({
+  await supabaseFetch('games', {
+    method: 'POST',
+    body: JSON.stringify({
       game_name: gameData.gameName,
       data: gameData,
-      updated_at: new Date()
-    });
+      updated_at: new Date().toISOString(),
+    }),
+  });
 
   if (!gameData.gameOver) {
     localStorage.setItem('lastActiveGameId', gameData.gameName);
@@ -83,15 +103,13 @@ useEffect(() => {
 };
   
   const loadExistingGame = async (gameName, mode = 'edit') => {
-  const { data } = await supabase
-    .from('games')
-    .select('*')
-    .eq('game_name', gameName)
-    .single();
+  const data = await supabaseFetch(
+    `games?game_name=eq.${encodeURIComponent(gameName)}&select=data`
+  );
 
-  if (!data) return;
+  if (!data.length) return;
 
-  const game = data.data;
+  const game = data[0].data;
 
   setGameName(game.gameName);
   setMaxScore(game.maxScore);
