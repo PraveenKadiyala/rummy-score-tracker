@@ -695,7 +695,7 @@ localStorage.setItem('playerStats', JSON.stringify(updatedStats));
         )}
 
         {/* Scoreboard */}
-        <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
+        <div className="print-scorecard bg-white rounded-2xl shadow-lg overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-green-600 text-white">
@@ -762,6 +762,15 @@ localStorage.setItem('playerStats', JSON.stringify(updatedStats));
               </button>
             </div>
           )}
+
+          <div className="p-4 print:hidden"">
+  <button
+    onClick={() => window.print()}
+    className="w-full py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700"
+  >
+    🖨️ Save Scorecard
+  </button>
+</div>
         </div>
 
         {/* Round History */}
