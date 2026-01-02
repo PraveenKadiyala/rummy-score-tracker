@@ -763,7 +763,7 @@ localStorage.setItem('playerStats', JSON.stringify(updatedStats));
             </div>
           )}
 
-          <div className="p-4 print:hidden"">
+          <div className="p-4 print:hidden">
   <button
     onClick={() => window.print()}
     className="w-full py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700"
