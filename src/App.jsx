@@ -50,89 +50,78 @@ useEffect(() => {
     }
   }, [viewMode, activeGameId]);
 
-  const loadGames = async () => {
-    try {
-      const stored = await window.storage.list('game:', true); // true = load from shared storage
-      if (stored && stored.keys) {
-        const gamePromises = stored.keys.map(async (key) => {
-          const result = await window.storage.get(key, true); // true = shared storage
-          return result ? JSON.parse(result.value) : null;
-        });
-        const loadedGames = (await Promise.all(gamePromises)).filter(g => g);
-        setGames(loadedGames.sort((a, b) => b.timestamp - a.timestamp));
-      }
-    } catch (err) {
-      console.log('No saved games yet');
-    }
-  };
+  const loadGames = () => {
+  const loadedGames = [];
 
-  const loadPlayerStats = async () => {
-  try {
-    const result = await window.storage.get('playerStats', true);
-    if (result) {
-      setPlayerStats(JSON.parse(result.value));
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key.startsWith('game:')) {
+      const game = JSON.parse(localStorage.getItem(key));
+      loadedGames.push(game);
     }
-  } catch (err) {
-    console.log('No player stats yet');
+  }
+
+  setGames(loadedGames.sort((a, b) => b.timestamp - a.timestamp));
+};
+
+  const loadPlayerStats = () => {
+  const data = localStorage.getItem('playerStats');
+  if (data) {
+    setPlayerStats(JSON.parse(data));
   }
 };
   
-  const loadActiveGame = async () => {
-    if (!activeGameId) return;
-    try {
-      const result = await window.storage.get(`game:${activeGameId}`, true); // true = shared storage
-      if (result) {
-        const game = JSON.parse(result.value);
-        setRoundScores(game.roundScores);
-        setCurrentRound(game.currentRound);
-        setEliminatedPlayers(game.eliminatedPlayers || []);
-        setGameOver(game.gameOver);
-      }
-    } catch (err) {
-      console.error('Failed to load active game:', err);
-    }
-  };
+  const loadActiveGame = () => {
+  if (!activeGameId) return;
 
-  const saveGame = async (gameData) => {
-    try {
-      const gameId = gameData.id || `game_${Date.now()}`;
+  const data = localStorage.getItem(`game:${activeGameId}`);
+  if (!data) return;
 
-      // 👇 ADD THIS LINE (VERY IMPORTANT)
-    if (!gameData.gameOver) {
-  localStorage.setItem('lastActiveGameId', gameId);
-}
-      
-      await window.storage.set(`game:${gameId}`, JSON.stringify({
-        ...gameData,
-        id: gameId,
-        timestamp: Date.now()
-      }), true); // true = shared storage, visible to all users
-      await loadGames();
-    } catch (err) {
-      console.error('Failed to save game:', err);
-    }
-  };
+  const game = JSON.parse(data);
+  setRoundScores(game.roundScores);
+  setCurrentRound(game.currentRound);
+  setEliminatedPlayers(game.eliminatedPlayers || []);
+  setGameOver(game.gameOver);
+};
 
-  const loadExistingGame = async (gameId, mode = 'edit') => {
-    try {
-      const result = await window.storage.get(`game:${gameId}`, true); // true = shared storage
-      if (result) {
-        const game = JSON.parse(result.value);
-        setGameName(game.gameName);
-        setMaxScore(game.maxScore);
-        setPlayerNames(game.playerNames);
-        setRoundScores(game.roundScores);
-        setCurrentRound(game.currentRound);
-        setGameOver(game.gameOver);
-        setEliminatedPlayers(game.eliminatedPlayers || []);
-        setViewMode(mode);
-        setActiveGameId(gameId);
-        setScreen('scoreboard');
-      }
-    } catch (err) {
-      console.error('Failed to load game:', err);
-    }
-  };
+  const saveGame = (gameData) => {
+  const gameId = gameData.id || `game_${Date.now()}`;
+
+  // Save game
+  localStorage.setItem(
+    `game:${gameId}`,
+    JSON.stringify({
+      ...gameData,
+      id: gameId,
+      timestamp: Date.now()
+    })
+  );
+
+  // Track active draft
+  if (!gameData.gameOver) {
+    localStorage.setItem('lastActiveGameId', gameId);
+  }
+
+  loadGames(); // reload list
+};
+  
+  const loadExistingGame = (gameId, mode = 'edit') => {
+  const data = localStorage.getItem(`game:${gameId}`);
+  if (!data) return;
+
+  const game = JSON.parse(data);
+
+  setGameName(game.gameName);
+  setMaxScore(game.maxScore);
+  setPlayerNames(game.playerNames);
+  setRoundScores(game.roundScores);
+  setCurrentRound(game.currentRound);
+  setGameOver(game.gameOver);
+  setEliminatedPlayers(game.eliminatedPlayers || []);
+  setViewMode(mode);
+  setActiveGameId(gameId);
+  setScreen('scoreboard');
+};  
 
   const handleSetupNext = () => {
     if (setupStep === 1 && numPlayers >= 2 && numPlayers <= 6) {
@@ -306,11 +295,7 @@ playerNames.forEach(player => {
 
 // Save stats
 setPlayerStats(updatedStats);
-await window.storage.set(
-  'playerStats',
-  JSON.stringify(updatedStats),
-  true
-);
+localStorage.setItem('playerStats', JSON.stringify(updatedStats));
     
     await saveGame({
       id: activeGameId,
@@ -602,11 +587,14 @@ await window.storage.set(
                 </div>
               )}
               <button
-                onClick={() => setScreen('home')}
-                className="px-4 py-2 text-sm bg-gray-200 rounded-lg hover:bg-gray-300"
-              >
-                Exit
-              </button>
+  onClick={() => {
+    localStorage.removeItem('lastActiveGameId');
+    setScreen('home');
+  }}
+  className="px-4 py-2 text-sm bg-gray-200 rounded-lg hover:bg-gray-300"
+>
+  Exit
+</button>
             </div>
           </div>
           <div className="flex items-center gap-4 text-gray-600">
