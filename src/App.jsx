@@ -1,6 +1,6 @@
 import { supabase } from './supabase';
 import React, { useState, useEffect } from 'react';
-import { AlertCircle, Plus, Save, Trophy, RotateCcw, PlayCircle, Eye, Edit } from 'lucide-react';
+import { AlertCircle, Save, Trophy, RotateCcw, PlayCircle, Eye, Edit } from 'lucide-react';
 
 export default function App() {
   const [screen, setScreen] = useState('home');
@@ -13,18 +13,12 @@ export default function App() {
   const [roundScores, setRoundScores] = useState([]);
   const [currentRoundInput, setCurrentRoundInput] = useState({});
   const [gameOver, setGameOver] = useState(false);
-  const [games, setGames] = useState([]);
   const [eliminatedPlayers, setEliminatedPlayers] = useState([]);
   const [showEliminationDialog, setShowEliminationDialog] = useState(false);
   const [pendingEliminations, setPendingEliminations] = useState([]);
   const [viewMode, setViewMode] = useState('edit'); // 'edit' or 'view'
     const [playerStats, setPlayerStats] = useState({});
 
-
-  // Load games from storage on mount
-  useEffect(() => {
-    loadGames();
-  }, []);
 
   useEffect(() => {
   loadPlayerStats();
@@ -40,28 +34,15 @@ useEffect(() => {
 
   // Auto-refresh in view mode
   useEffect(() => {
-  if (!gameName) return;
+  if (!gameName || gameOver|| viewMode !== 'view') return;
 
   const interval = setInterval(() => {
     loadActiveGame();
   }, 2000);
 
   return () => clearInterval(interval);
-}, [gameName]);
+}, [gameName, gameOver]);
 
-  const loadGames = () => {
-  const loadedGames = [];
-
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (key.startsWith('game:')) {
-      const game = JSON.parse(localStorage.getItem(key));
-      loadedGames.push(game);
-    }
-  }
-
-  setGames(loadedGames.sort((a, b) => b.timestamp - a.timestamp));
-};
 
   const loadPlayerStats = () => {
   const data = localStorage.getItem('playerStats');
@@ -120,7 +101,6 @@ useEffect(() => {
   setGameOver(game.gameOver);
   setEliminatedPlayers(game.eliminatedPlayers || []);
   setViewMode(mode);
-  setActiveGameId(game.gameName);
   setScreen('scoreboard');
 }; 
 
@@ -148,8 +128,6 @@ useEffect(() => {
     setGameOver(false);
     setEliminatedPlayers([]);
     setViewMode('edit');
-    
-    setActiveGameId(gameName);
 
     setScreen('scoreboard');
     // ✅ PASTE THIS PART HERE (VERY IMPORTANT)
@@ -255,7 +233,6 @@ saveGame({
 
     // Save game state
     await saveGame({
-      id: activeGameId,
       gameName,
       maxScore,
       playerNames,
@@ -298,7 +275,6 @@ setPlayerStats(updatedStats);
 localStorage.setItem('playerStats', JSON.stringify(updatedStats));
     
     await saveGame({
-      id: activeGameId,
       gameName,
       maxScore,
       playerNames,
@@ -320,7 +296,6 @@ localStorage.setItem('playerStats', JSON.stringify(updatedStats));
     }
 
     await saveGame({
-      id: activeGameId,
       gameName,
       maxScore,
       playerNames,
@@ -345,12 +320,6 @@ localStorage.setItem('playerStats', JSON.stringify(updatedStats));
 
   const getActivePlayers = () => {
     return playerNames.filter(name => !eliminatedPlayers.includes(name));
-  };
-
-  const getSortedPlayers = () => {
-    return [...playerNames].sort((a, b) => {
-      return calculateTotalScore(a) - calculateTotalScore(b);
-    });
   };
 
   // Home Screen
@@ -381,39 +350,7 @@ localStorage.setItem('playerStats', JSON.stringify(updatedStats));
             </button>
           </div>
 
-          {games.length > 0 && (
-            <div className="bg-white rounded-2xl shadow-lg p-6">
-              <h2 className="text-xl font-semibold mb-4 text-gray-800">Recent Games</h2>
-
-              <div className="space-y-3">
-                {games.slice(0, 5).map((game) => (
-                  <div key={game.id} className="p-4 bg-gray-50 rounded-lg">
-                    <div className="font-semibold text-gray-800 mb-2">{game.gameName}</div>
-                    <div className="text-sm text-gray-600 mb-3">
-                      {game.playerNames.length} players • Round {game.currentRound}
-                      {game.gameOver && <span className="ml-2 text-red-600">• Finished</span>}
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => loadExistingGame(game.id, 'edit')}
-                        className="flex-1 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
-                      >
-                        <Edit className="w-4 h-4" />
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => loadExistingGame(game.id, 'view')}
-                        className="flex-1 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
-                      >
-                        <Eye className="w-4 h-4" />
-                        View Only
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          
           {Object.keys(playerStats).length > 0 && (
   <div className="bg-white rounded-2xl shadow-lg p-6 mt-6">
     <h2 className="text-xl font-semibold mb-4 text-gray-800">
