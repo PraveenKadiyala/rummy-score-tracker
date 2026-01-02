@@ -1,3 +1,4 @@
+import { supabase } from './supabase';
 import React, { useState, useEffect } from 'react';
 import { AlertCircle, Plus, Save, Trophy, RotateCcw, PlayCircle, Eye, Edit } from 'lucide-react';
 
@@ -17,8 +18,7 @@ export default function App() {
   const [showEliminationDialog, setShowEliminationDialog] = useState(false);
   const [pendingEliminations, setPendingEliminations] = useState([]);
   const [viewMode, setViewMode] = useState('edit'); // 'edit' or 'view'
-  const [activeGameId, setActiveGameId] = useState(null);
-  const [playerStats, setPlayerStats] = useState({});
+    const [playerStats, setPlayerStats] = useState({});
 
 
   // Load games from storage on mount
@@ -32,23 +32,22 @@ export default function App() {
   
   // Resume last active game (Draft)
 useEffect(() => {
-  if (games.length === 0) return;
-
-  const lastGameId = localStorage.getItem('lastActiveGameId');
-  if (lastGameId) {
-    loadExistingGame(lastGameId, 'edit');
+  const lastGame = localStorage.getItem('lastActiveGameId');
+  if (lastGame) {
+    loadExistingGame(lastGame, 'edit');
   }
-}, [games]);  
+}, []); 
 
   // Auto-refresh in view mode
   useEffect(() => {
-    if (viewMode === 'view' && activeGameId) {
-      const interval = setInterval(() => {
-        loadActiveGame();
-      }, 2000); // Refresh every 2 seconds
-      return () => clearInterval(interval);
-    }
-  }, [viewMode, activeGameId]);
+  if (!gameName) return;
+
+  const interval = setInterval(() => {
+    loadActiveGame();
+  }, 2000);
+
+  return () => clearInterval(interval);
+}, [gameName]);
 
   const loadGames = () => {
   const loadedGames = [];
@@ -71,45 +70,47 @@ useEffect(() => {
   }
 };
   
-  const loadActiveGame = () => {
-  if (!activeGameId) return;
+  const loadActiveGame = async () => {
+  if (!gameName) return;
 
-  const data = localStorage.getItem(`game:${activeGameId}`);
+  const { data } = await supabase
+    .from('games')
+    .select('*')
+    .eq('game_name', gameName)
+    .single();
+
   if (!data) return;
 
-  const game = JSON.parse(data);
+  const game = data.data;
   setRoundScores(game.roundScores);
   setCurrentRound(game.currentRound);
   setEliminatedPlayers(game.eliminatedPlayers || []);
   setGameOver(game.gameOver);
 };
+  const saveGame = async (gameData) => {
+  await supabase
+    .from('games')
+    .upsert({
+      game_name: gameData.gameName,
+      data: gameData,
+      updated_at: new Date()
+    });
 
-  const saveGame = (gameData) => {
-  const gameId = gameData.id || `game_${Date.now()}`;
-
-  // Save game
-  localStorage.setItem(
-    `game:${gameId}`,
-    JSON.stringify({
-      ...gameData,
-      id: gameId,
-      timestamp: Date.now()
-    })
-  );
-
-  // Track active draft
   if (!gameData.gameOver) {
-    localStorage.setItem('lastActiveGameId', gameId);
+    localStorage.setItem('lastActiveGameId', gameData.gameName);
   }
-
-  loadGames(); // reload list
 };
   
-  const loadExistingGame = (gameId, mode = 'edit') => {
-  const data = localStorage.getItem(`game:${gameId}`);
+  const loadExistingGame = async (gameName, mode = 'edit') => {
+  const { data } = await supabase
+    .from('games')
+    .select('*')
+    .eq('game_name', gameName)
+    .single();
+
   if (!data) return;
 
-  const game = JSON.parse(data);
+  const game = data.data;
 
   setGameName(game.gameName);
   setMaxScore(game.maxScore);
@@ -119,9 +120,9 @@ useEffect(() => {
   setGameOver(game.gameOver);
   setEliminatedPlayers(game.eliminatedPlayers || []);
   setViewMode(mode);
-  setActiveGameId(gameId);
+  setActiveGameId(game.gameName);
   setScreen('scoreboard');
-};  
+}; 
 
   const handleSetupNext = () => {
     if (setupStep === 1 && numPlayers >= 2 && numPlayers <= 6) {
@@ -148,20 +149,19 @@ useEffect(() => {
     setEliminatedPlayers([]);
     setViewMode('edit');
     
-    const newGameId = `${gameName.replace(/\s+/g, '_')}_${Date.now()}`;
-    setActiveGameId(newGameId);
+    setActiveGameId(gameName);
+
     setScreen('scoreboard');
     // ✅ PASTE THIS PART HERE (VERY IMPORTANT)
-  saveGame({
-    id: newGameId,
-    gameName,
-    maxScore,
-    playerNames,
-    roundScores: [],
-    currentRound: 1,
-    gameOver: false,
-    eliminatedPlayers: []
-  });
+saveGame({
+  gameName, // 👈 this is the ID now
+  maxScore,
+  playerNames,
+  roundScores: [],
+  currentRound: 1,
+  gameOver: false,
+  eliminatedPlayers: []
+});
 };
 
   const calculateTotalScore = (playerName) => {
