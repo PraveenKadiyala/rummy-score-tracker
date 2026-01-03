@@ -21,6 +21,8 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const [lastGameId, setLastGameId] = useState('');
 const [joinError, setJoinError] = useState('');
+  const [joining, setJoining] = useState(false);
+
 
 const supabaseFetch = async (endpoint, options = {}) => {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${endpoint}`, {
@@ -46,14 +48,6 @@ const supabaseFetch = async (endpoint, options = {}) => {
   loadPlayerStats();
 }, []);
   
-  // Resume last active game (Draft)
-useEffect(() => {
-  const lastGame = localStorage.getItem('lastActiveGameId');
-  if (lastGame) {
-    loadExistingGame(lastGame, 'edit');
-  }
-}, []); 
-
   useEffect(() => {
   const last = localStorage.getItem('lastActiveGameId');
   if (last) {
@@ -595,10 +589,12 @@ if (screen === 'join') {
 )}
 
           <button
-            onClick={() => {
-              if (!gameName.trim()) return;
-              loadExistingGame(gameName.trim(), 'view');
-            }}
+            onClick={async () => {
+  if (!gameName.trim()) return;
+  setJoining(true);
+  await loadExistingGame(gameName.trim(), 'view');
+  setJoining(false);
+}}
             className="w-full mt-6 py-4 bg-blue-600 text-white rounded-xl font-semibold text-lg hover:bg-blue-700"
           >
             👀 View Live Scores
