@@ -1,1 +1,1 @@
-# rummy-score-tracker
+# card-score-tracker
