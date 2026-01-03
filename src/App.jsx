@@ -582,15 +582,17 @@ if (screen === 'join') {
   setGameName(e.target.value);
   setJoinError('');
 }}
-            {joinError && (
-  <p className="text-red-600 mt-3 text-center font-semibold">
-    {joinError}
-  </p>
-)}
+  
             className="w-full p-4 text-xl border-2 border-gray-300 rounded-xl focus:border-blue-600 focus:outline-none"
             placeholder="Exact game name"
             autoFocus
           />
+
+                    {joinError && (
+  <p className="text-red-600 mt-3 text-center font-semibold">
+    {joinError}
+  </p>
+)}
 
           <button
             onClick={() => {
