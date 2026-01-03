@@ -387,7 +387,7 @@ localStorage.setItem('playerStats', JSON.stringify(updatedStats));
         <div className="max-w-2xl mx-auto">
           <div className="text-center mb-8">
             <Trophy className="w-16 h-16 mx-auto mb-4 text-green-600" />
-            <h1 className="text-4xl font-bold text-gray-800 mb-2">Rummy Score Tracker</h1>
+            <h1 className="text-4xl font-bold text-gray-800 mb-2">Card Score Tracker</h1>
             <p className="text-gray-600">Never calculate totals manually again</p>
           </div>
 
