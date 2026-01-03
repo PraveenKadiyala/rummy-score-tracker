@@ -19,9 +19,9 @@ export default function App() {
     const [playerStats, setPlayerStats] = useState({});
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const [lastGameId, setLastGameId] = useState('');
 const [joinError, setJoinError] = useState('');
   const [joining, setJoining] = useState(false);
+const [resumeGameId, setResumeGameId] = useState(null);
 
 
 const supabaseFetch = async (endpoint, options = {}) => {
@@ -43,18 +43,18 @@ const supabaseFetch = async (endpoint, options = {}) => {
 
   return res.json();
 };
-
+  
   useEffect(() => {
   loadPlayerStats();
 }, []);
   
-  useEffect(() => {
-  const last = localStorage.getItem('lastActiveGameId');
-  if (last) {
-    setLastGameId(last);
+useEffect(() => {
+  const saved = localStorage.getItem('lastActiveGameId');
+  if (saved) {
+    setResumeGameId(saved);
   }
 }, []);
-
+  
   // Auto-refresh in view mode
   useEffect(() => {
   if (!gameName || gameOver|| viewMode !== 'view') return;
@@ -101,38 +101,41 @@ const supabaseFetch = async (endpoint, options = {}) => {
   });
 
   if (!gameData.gameOver) {
-  localStorage.setItem('lastActiveGameId', gameData.gameName);
-  setLastGameId(gameData.gameName); // 👈 ADD THIS
-}
+    localStorage.setItem('lastActiveGameId', gameData.gameName);
+    setResumeGameId(gameData.gameName);
+  }
 };
   
   const loadExistingGame = async (gameName, mode = 'edit') => {
   setJoinError('');
 
-  const data = await supabaseFetch(
-    `games?game_name=eq.${encodeURIComponent(gameName)}&select=data`
-  );
+  try {
+    const data = await supabaseFetch(
+      `games?game_name=eq.${encodeURIComponent(gameName)}&select=data`
+    );
 
-  if (!data || data.length === 0) {
-    if (mode === 'view') {
-      setJoinError('❌ Game not found. Please check the name.');
+    if (!data || data.length === 0) {
+      if (mode === 'view') {
+        setJoinError('❌ Game not found. Please check the name.');
+      }
+      return;
     }
-    return;
+
+    const game = data[0].data;
+
+    setGameName(game.gameName);
+    setMaxScore(game.maxScore);
+    setPlayerNames(game.playerNames);
+    setRoundScores(game.roundScores);
+    setCurrentRound(game.currentRound);
+    setGameOver(game.gameOver);
+    setEliminatedPlayers(game.eliminatedPlayers || []);
+    setViewMode(mode);
+
+    setScreen('scoreboard'); // 🔥 MUST stay here
+  } catch (err) {
+    setJoinError('❌ Unable to join game.');
   }
-
-  const game = data[0].data;
-
-  setGameName(game.gameName);
-  setMaxScore(game.maxScore);
-  setPlayerNames(game.playerNames);
-  setRoundScores(game.roundScores);
-  setCurrentRound(game.currentRound);
-  setGameOver(game.gameOver);
-  setEliminatedPlayers(game.eliminatedPlayers || []);
-  setViewMode(mode);
-
-  // ✅ THIS WAS THE MISSING LINE
-  setScreen('scoreboard');
 };
   
   const handleSetupNext = () => {
@@ -394,9 +397,9 @@ localStorage.setItem('playerStats', JSON.stringify(updatedStats));
 </div>
 
           {/* Resume Last Game */}
-{lastGameId && (
+{resumeGameId && (
   <button
-    onClick={() => loadExistingGame(lastGameId, 'edit')}
+    onClick={() => loadExistingGame(resumeGameId, 'edit')}
     className="w-full mt-4 bg-purple-600 text-white py-4 rounded-xl font-semibold text-lg hover:bg-purple-700 transition-colors"
   >
     ▶️ Resume Last Game
@@ -593,17 +596,17 @@ if (screen === 'join') {
 )}
 
           <button
-            onClick={async () => {
-  if (!gameName.trim()) return;
-  setJoining(true);
-  await loadExistingGame(gameName.trim(), 'view');
-  setJoining(false);
-}}
-            className="w-full mt-6 py-4 bg-blue-600 text-white rounded-xl font-semibold text-lg hover:bg-blue-700"
-          >
-            👀 View Live Scores
-          </button>
-
+  onClick={async () => {
+    if (!gameName.trim()) return;
+    setJoining(true);
+    await loadExistingGame(gameName.trim(), 'view');
+    setJoining(false);
+  }}
+  disabled={joining}
+  className="w-full mt-6 py-4 bg-blue-600 text-white rounded-xl font-semibold text-lg hover:bg-blue-700 disabled:opacity-60"
+>
+  {joining ? 'Joining…' : '👀 View Live Scores'}
+</button>
           <button
             onClick={() => setScreen('home')}
             className="w-full mt-4 py-3 text-gray-600 hover:text-gray-800"
