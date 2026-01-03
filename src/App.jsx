@@ -19,6 +19,8 @@ export default function App() {
     const [playerStats, setPlayerStats] = useState({});
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const [lastGameId, setLastGameId] = useState('');
+const [joinError, setJoinError] = useState('');
 
 const supabaseFetch = async (endpoint, options = {}) => {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${endpoint}`, {
@@ -51,6 +53,13 @@ useEffect(() => {
     loadExistingGame(lastGame, 'edit');
   }
 }, []); 
+
+  useEffect(() => {
+  const last = localStorage.getItem('lastActiveGameId');
+  if (last) {
+    setLastGameId(last);
+  }
+}, []);
 
   // Auto-refresh in view mode
   useEffect(() => {
@@ -98,8 +107,9 @@ useEffect(() => {
   });
 
   if (!gameData.gameOver) {
-    localStorage.setItem('lastActiveGameId', gameData.gameName);
-  }
+  localStorage.setItem('lastActiveGameId', gameData.gameName);
+  setLastGameId(gameData.gameName); // 👈 ADD THIS
+}
 };
   
   const loadExistingGame = async (gameName, mode = 'edit') => {
@@ -107,7 +117,12 @@ useEffect(() => {
     `games?game_name=eq.${encodeURIComponent(gameName)}&select=data`
   );
 
-  if (!data.length) return;
+  if (!data.length) {
+  if (mode === 'view') {
+    setJoinError('❌ Game not found. Please check the name.');
+  }
+  return;
+}
 
   const game = data[0].data;
 
@@ -380,7 +395,15 @@ localStorage.setItem('playerStats', JSON.stringify(updatedStats));
   </button>
 </div>
 
-          
+          {/* Resume Last Game */}
+{lastGameId && (
+  <button
+    onClick={() => loadExistingGame(lastGameId, 'edit')}
+    className="w-full mt-4 bg-purple-600 text-white py-4 rounded-xl font-semibold text-lg hover:bg-purple-700 transition-colors"
+  >
+    ▶️ Resume Last Game
+  </button>
+)}
           {Object.keys(playerStats).length > 0 && (
   <div className="bg-white rounded-2xl shadow-lg p-6 mt-6">
     <h2 className="text-xl font-semibold mb-4 text-gray-800">
@@ -555,7 +578,15 @@ if (screen === 'join') {
           <input
             type="text"
             value={gameName}
-            onChange={(e) => setGameName(e.target.value)}
+            onChange={(e) => {
+  setGameName(e.target.value);
+  setJoinError('');
+}}
+            {joinError && (
+  <p className="text-red-600 mt-3 text-center font-semibold">
+    {joinError}
+  </p>
+)}
             className="w-full p-4 text-xl border-2 border-gray-300 rounded-xl focus:border-blue-600 focus:outline-none"
             placeholder="Exact game name"
             autoFocus
@@ -601,7 +632,6 @@ if (screen === 'join') {
               )}
               <button
   onClick={() => {
-    localStorage.removeItem('lastActiveGameId');
     setScreen('home');
   }}
   className="px-4 py-2 text-sm bg-gray-200 rounded-lg hover:bg-gray-300"
