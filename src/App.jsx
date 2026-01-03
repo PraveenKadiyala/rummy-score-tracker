@@ -77,21 +77,28 @@ useEffect(() => {
   const loadActiveGame = async () => {
   if (!gameName) return;
 
-  const data = await supabaseFetch(
-    `games?game_name=eq.${encodeURIComponent(gameName)}&select=data`
-  );
+  try {
+    const rows = await supabaseFetch(
+      `games?game_name=eq.${encodeURIComponent(gameName)}&select=*`
+    );
 
-  if (!data.length) return;
+    if (!rows.length) return;
 
-  const game = data[0].data;
+    const game = rows[0].data;
 
-  setRoundScores(game.roundScores);
-  setCurrentRound(game.currentRound);
-  setEliminatedPlayers(game.eliminatedPlayers || []);
-  setGameOver(game.gameOver);
+    setRoundScores(game.roundScores || []);
+    setCurrentRound(game.currentRound || 1);
+    setEliminatedPlayers(game.eliminatedPlayers || []);
+    setGameOver(game.gameOver || false);
+  } catch (err) {
+    console.error('Live refresh failed', err);
+  }
 };
+  
   const saveGame = async (gameData) => {
-  await supabaseFetch('games', {
+  await supabaseFetch(
+  `games?on_conflict=game_name`,
+  {
     method: 'POST',
     body: JSON.stringify({
       game_name: gameData.gameName,
@@ -105,23 +112,23 @@ useEffect(() => {
     setResumeGameId(gameData.gameName);
   }
 };
-  
-  const loadExistingGame = async (gameName, mode = 'edit') => {
+
+const loadExistingGame = async (gameName, mode = 'edit') => {
   setJoinError('');
 
   try {
-    const data = await supabaseFetch(
-      `games?game_name=eq.${encodeURIComponent(gameName)}&select=data`
+    const rows = await supabaseFetch(
+      `games?game_name=eq.${encodeURIComponent(gameName)}&select=*`
     );
 
-    if (!data || data.length === 0) {
+    if (!rows || rows.length === 0) {
       if (mode === 'view') {
         setJoinError('❌ Game not found. Please check the name.');
       }
       return;
     }
 
-    const game = data[0].data;
+    const game = rows[0].data; // 👈 THIS IS THE ACTUAL GAME
 
     setGameName(game.gameName);
     setMaxScore(game.maxScore);
@@ -132,8 +139,9 @@ useEffect(() => {
     setEliminatedPlayers(game.eliminatedPlayers || []);
     setViewMode(mode);
 
-    setScreen('scoreboard'); // 🔥 MUST stay here
+    setScreen('scoreboard');
   } catch (err) {
+    console.error(err);
     setJoinError('❌ Unable to join game.');
   }
 };
