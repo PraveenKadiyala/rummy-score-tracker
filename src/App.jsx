@@ -49,10 +49,26 @@ const supabaseFetch = async (endpoint, options = {}) => {
 }, []);
   
 useEffect(() => {
-  const saved = localStorage.getItem('lastActiveGameId');
-  if (saved) {
-    setResumeGameId(saved);
-  }
+  const restoreResumeGame = async () => {
+    const saved = localStorage.getItem('lastActiveGameId');
+    if (!saved) return;
+
+    try {
+      const rows = await supabaseFetch(
+        `games?game_name=eq.${encodeURIComponent(saved)}&select=data`
+      );
+
+      if (rows.length && !rows[0].data.gameOver) {
+        setResumeGameId(saved);
+      } else {
+        localStorage.removeItem('lastActiveGameId');
+      }
+    } catch (err) {
+      console.error('Resume check failed', err);
+    }
+  };
+
+  restoreResumeGame();
 }, []);
   
   // Auto-refresh in view mode
@@ -643,14 +659,20 @@ if (screen === 'join') {
                   View Only
                 </div>
               )}
+             
               <button
   onClick={() => {
+    if (!gameOver && gameName) {
+      localStorage.setItem('lastActiveGameId', gameName);
+      setResumeGameId(gameName);
+    }
     setScreen('home');
   }}
   className="px-4 py-2 text-sm bg-gray-200 rounded-lg hover:bg-gray-300"
 >
   Exit
 </button>
+              
             </div>
           </div>
           <div className="flex items-center gap-4 text-gray-600">
