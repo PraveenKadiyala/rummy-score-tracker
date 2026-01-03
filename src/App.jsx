@@ -107,16 +107,18 @@ const supabaseFetch = async (endpoint, options = {}) => {
 };
   
   const loadExistingGame = async (gameName, mode = 'edit') => {
+  setJoinError('');
+
   const data = await supabaseFetch(
     `games?game_name=eq.${encodeURIComponent(gameName)}&select=data`
   );
 
-  if (!data.length) {
-  if (mode === 'view') {
-    setJoinError('❌ Game not found. Please check the name.');
+  if (!data || data.length === 0) {
+    if (mode === 'view') {
+      setJoinError('❌ Game not found. Please check the name.');
+    }
+    return;
   }
-  return;
-}
 
   const game = data[0].data;
 
@@ -128,9 +130,11 @@ const supabaseFetch = async (endpoint, options = {}) => {
   setGameOver(game.gameOver);
   setEliminatedPlayers(game.eliminatedPlayers || []);
   setViewMode(mode);
-  setScreen('scoreboard');
-}; 
 
+  // ✅ THIS WAS THE MISSING LINE
+  setScreen('scoreboard');
+};
+  
   const handleSetupNext = () => {
     if (setupStep === 1 && numPlayers >= 2 && numPlayers <= 6) {
       setPlayerNames(Array(parseInt(numPlayers)).fill(''));
