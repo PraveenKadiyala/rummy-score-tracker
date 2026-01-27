@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { AlertCircle, Save, Trophy, RotateCcw, PlayCircle, Eye, Edit } from 'lucide-react';
+const loadUsers = () => JSON.parse(localStorage.getItem('users') || '{}');
+const saveUsers = (users) => localStorage.setItem('users', JSON.stringify(users));
 
 export default function App() {
   const [screen, setScreen] = useState('home');
@@ -22,9 +24,32 @@ const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const [joinError, setJoinError] = useState('');
   const [joining, setJoining] = useState(false);
 const [resumeGameId, setResumeGameId] = useState(null);
+  const [user, setUser] = useState(null); // logged-in user
+const [users, setUsers] = useState({}); // all users
+const [playersMaster, setPlayersMaster] = useState([]); // created players
+const [selectedPlayers, setSelectedPlayers] = useState([]);
 
+const handleLogin = (username, password) => {
+  const users = loadUsers();
 
-const supabaseFetch = async (endpoint, options = {}) => {
+  if (!users[username]) {
+    users[username] = {
+      password,
+      players: []
+    };
+    saveUsers(users);
+  }
+
+  if (users[username].password !== password) {
+    alert('Invalid password');
+    return;
+  }
+
+  setUser(username);
+  setPlayersMaster(users[username].players || []);
+};
+  
+  const supabaseFetch = async (endpoint, options = {}) => {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${endpoint}`, {
     headers: {
       apikey: SUPABASE_KEY,
@@ -166,9 +191,10 @@ const loadExistingGame = async (gameName, mode = 'edit') => {
     if (setupStep === 1 && numPlayers >= 2 && numPlayers <= 6) {
       setPlayerNames(Array(parseInt(numPlayers)).fill(''));
       setSetupStep(2);
-    } else if (setupStep === 2 && playerNames.every(name => name.trim())) {
-      setSetupStep(3);
-    } else if (setupStep === 3 && gameName.trim()) {
+    } else if (setupStep === 2 && selectedPlayers.length === Number(numPlayers)) {
+  setPlayerNames(selectedPlayers);
+  setSetupStep(3);
+} else if (setupStep === 3 && gameName.trim()) {
       setSetupStep(4);
     } else if (setupStep === 4 && maxScore > 0) {
       startGame();
@@ -380,6 +406,47 @@ localStorage.setItem('playerStats', JSON.stringify(updatedStats));
     return playerNames.filter(name => !eliminatedPlayers.includes(name));
   };
 
+  if (!user) {
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="bg-white p-6 rounded-xl shadow-lg w-80">
+        <h2 className="text-xl font-bold mb-4 text-center">Login</h2>
+
+        <input id="u" placeholder="User ID" className="w-full p-2 border mb-3"/>
+        <input id="p" type="password" placeholder="Password" className="w-full p-2 border mb-4"/>
+
+        <button
+          onClick={() =>
+            handleLogin(
+              document.getElementById('u').value,
+              document.getElementById('p').value
+            )
+          }
+          className="w-full bg-green-600 text-white py-2 rounded"
+        >
+          Login / Register
+        </button>
+      </div>
+    </div>
+  );
+}
+
+  const createPlayer = (name) => {
+  const clean = name.trim();
+  if (!clean) return;
+
+  if (playersMaster.includes(clean)) {
+    alert('Player already exists');
+    return;
+  }
+
+  const users = loadUsers();
+  users[user].players.push(clean);
+  saveUsers(users);
+
+  setPlayersMaster(users[user].players);
+};
+  
   // Home Screen
   if (screen === 'home') {
     return (
@@ -400,6 +467,7 @@ localStorage.setItem('playerStats', JSON.stringify(updatedStats));
       setSetupStep(1);
       setNumPlayers('');
       setPlayerNames([]);
+      setSelectedPlayers([]); // ✅ ADD THIS
       setGameName('');
       setMaxScore('');
     }}
@@ -435,7 +503,22 @@ localStorage.setItem('playerStats', JSON.stringify(updatedStats));
     <h2 className="text-xl font-semibold mb-4 text-gray-800">
       🏆 Player Progress
     </h2>
+</div>
+)}
+    
+{/* 👥 Players Section */}
+<div className="bg-white rounded-2xl shadow-lg p-6 mt-6">
+  <h2 className="text-xl font-semibold mb-4">👥 Players</h2>
 
+  <div className="space-y-2">
+    {playersMaster.map(p => (
+      <div key={p} className="bg-gray-50 p-3 rounded">
+        {p}
+      </div>
+    ))}
+  </div>
+</div>
+          
     <div className="space-y-2">
       {Object.entries(playerStats).map(([player, stats]) => (
         <div
@@ -495,29 +578,48 @@ localStorage.setItem('playerStats', JSON.stringify(updatedStats));
             )}
 
             {setupStep === 2 && (
-              <div>
-                <label className="block text-lg font-semibold mb-3 text-gray-700">
-                  Enter player names
-                </label>
-                <div className="space-y-3">
-                  {playerNames.map((name, idx) => (
-                    <input
-                      key={idx}
-                      type="text"
-                      value={name}
-                      onChange={(e) => {
-                        const newNames = [...playerNames];
-                        newNames[idx] = e.target.value;
-                        setPlayerNames(newNames);
-                      }}
-                      className="w-full p-4 text-lg border-2 border-gray-300 rounded-xl focus:border-green-600 focus:outline-none"
-                      placeholder={`Player ${idx + 1} name`}
-                      autoFocus={idx === 0}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
+  <div>
+    <label className="block font-semibold mb-2">
+      Select {numPlayers} Players
+    </label>
+
+    {playersMaster.map(player => (
+      <label key={player} className="block">
+        <input
+          type="checkbox"
+          checked={selectedPlayers.includes(player)}
+          onChange={() => {
+            setSelectedPlayers(prev =>
+              prev.includes(player)
+                ? prev.filter(p => p !== player)
+                : prev.length < numPlayers
+                  ? [...prev, player]
+                  : prev
+            );
+          }}
+        />{' '}
+        {player}
+      </label>
+    ))}
+
+    <div className="mt-4">
+      <input
+        placeholder="New player name"
+        id="newPlayer"
+        className="border p-2 w-full"
+      />
+      <button
+        onClick={() => {
+          createPlayer(document.getElementById('newPlayer').value);
+          document.getElementById('newPlayer').value = '';
+        }}
+        className="mt-2 w-full bg-blue-600 text-white py-2 rounded"
+      >
+        ➕ Create Player
+      </button>
+    </div>
+  </div>
+)}
 
             {setupStep === 3 && (
               <div>
@@ -565,7 +667,7 @@ localStorage.setItem('playerStats', JSON.stringify(updatedStats));
                 onClick={handleSetupNext}
                 disabled={
                   (setupStep === 1 && (numPlayers < 2 || numPlayers > 6)) ||
-                  (setupStep === 2 && !playerNames.every(name => name.trim())) ||
+                  (setupStep === 2 && selectedPlayers.length !== Number(numPlayers)) ||
                   (setupStep === 3 && !gameName.trim()) ||
                   (setupStep === 4 && maxScore <= 0)
                 }
