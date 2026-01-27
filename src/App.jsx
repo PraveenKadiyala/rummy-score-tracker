@@ -536,21 +536,6 @@ localStorage.setItem('playerStats', JSON.stringify(updatedStats));
   </>
 )}          
   
-          <div className="space-y-2">
-      {Object.entries(playerStats).map(([player, stats]) => (
-        <div
-          key={player}
-          className="flex justify-between bg-gray-50 p-3 rounded-lg"
-        >
-          <span className="font-semibold">{player}</span>
-          <span className="text-gray-700">
-            Games: {stats.games} | Wins: {stats.wins}
-          </span>
-        </div>
-      ))}
-    </div>
-  </div>
-)}
         </div>
       </div>
     );
