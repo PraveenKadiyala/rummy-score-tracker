@@ -498,28 +498,45 @@ localStorage.setItem('playerStats', JSON.stringify(updatedStats));
     ▶️ Resume Last Game
   </button>
 )}
-          {Object.keys(playerStats).length > 0 && (
-  <div className="bg-white rounded-2xl shadow-lg p-6 mt-6">
-    <h2 className="text-xl font-semibold mb-4 text-gray-800">
-      🏆 Player Progress
-    </h2>
-</div>
-)}
-    
-{/* 👥 Players Section */}
-<div className="bg-white rounded-2xl shadow-lg p-6 mt-6">
-  <h2 className="text-xl font-semibold mb-4">👥 Players</h2>
+  {Object.keys(playerStats).length > 0 && (
+  <>
+    {/* 🏆 Player Progress */}
+    <div className="bg-white rounded-2xl shadow-lg p-6 mt-6">
+      <h2 className="text-xl font-semibold mb-4 text-gray-800">
+        🏆 Player Progress
+      </h2>
 
-  <div className="space-y-2">
-    {playersMaster.map(p => (
-      <div key={p} className="bg-gray-50 p-3 rounded">
-        {p}
+      <div className="space-y-2">
+        {Object.entries(playerStats).map(([player, stats]) => (
+          <div
+            key={player}
+            className="flex justify-between bg-gray-50 p-3 rounded-lg"
+          >
+            <span className="font-semibold">{player}</span>
+            <span className="text-gray-700">
+              Games: {stats.games} | Wins: {stats.wins}
+            </span>
+          </div>
+        ))}
       </div>
-    ))}
-  </div>
-</div>
-          
-    <div className="space-y-2">
+    </div>
+
+    {/* 👥 Players Section */}
+    <div className="bg-white rounded-2xl shadow-lg p-6 mt-6">
+      <h2 className="text-xl font-semibold mb-4">👥 Players</h2>
+
+      <div className="space-y-2">
+        {playersMaster.map(p => (
+          <div key={p} className="bg-gray-50 p-3 rounded">
+            {p}
+          </div>
+        ))}
+      </div>
+    </div>
+  </>
+)}          
+  
+          <div className="space-y-2">
       {Object.entries(playerStats).map(([player, stats]) => (
         <div
           key={player}
